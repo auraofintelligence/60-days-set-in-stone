@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sixty Days Set in Stone | An Interactive Experience</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            scroll-behavior: smooth;
+            background-color: #0c0a09; /* Stone-950 */
+        }
+        .lyric {
+            transition: all 0.3s ease-in-out;
+            opacity: 0.4;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+        }
+        .lyric.active {
+            opacity: 1;
+            transform: scale(1.05);
+            color: #f59e0b; /* Amber-500 */
+            background-color: rgba(245, 158, 11, 0.05);
+        }
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+        .popup-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        .popup-content {
+            background: #1c1917; /* Stone-900 */
+            border: 1px solid #44403c; /* Stone-700 */
+            padding: 2rem;
+            border-radius: 0.75rem;
+            max-width: 500px;
+            width: 90%;
+            position: relative;
+            transform: scale(0.95);
+            transition: transform 0.3s;
+        }
+        .popup-overlay.visible .popup-content {
+            transform: scale(1);
+        }
+        .lyric-link {
+            cursor: pointer;
+            text-decoration: underline;
+            text-decoration-style: dotted;
+            text-underline-offset: 4px;
+            color: #a8a29e; /* Stone-400 */
+            transition: color 0.2s;
+        }
+        .lyric-link:hover {
+            color: #f59e0b; /* Amber-500 */
+        }
+        .close-popup {
+            font-size: 2rem;
+            line-height: 1;
+        }
+        .popup-link {
+            display: inline-block;
+            margin-top: 1rem;
+            color: #fbbf24; /* Amber-400 */
+            text-decoration: underline;
+            font-weight: 600;
+        }
+        .popup-link:hover {
+            color: #f59e0b; /* Amber-500 */
+        }
+        .filter-btn {
+            transition: all 0.2s ease-in-out;
+        }
+        .filter-btn.active {
+            background-color: #f59e0b;
+            color: #1c1917;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .song-item.playing {
+            background-color: #292524; /* Stone-800 */
+            border-color: #f59e0b;
+        }
+    </style>
+</head>
+<body class="bg-stone-950 text-stone-300">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-white">Sixty Days Set in Stone</h1>
+            <p class="text-lg text-stone-400">An Interactive Experience by i.C.infinity</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Jukebox & Player Section -->
+            <div class="w-full">
+                <div class="bg-stone-900 p-6 rounded-lg border border-stone-800 shadow-2xl flex flex-col">
+                    <!-- Non-scrolling content -->
+                    <div>
+                        <h2 class="text-2xl font-bold text-white mb-4">Choose Your Style</h2>
+                        <audio id="audio-player" class="w-full mb-4" controls></audio>
+                        <div id="filter-container" class="mb-4">
+                            <!-- Filters will be dynamically generated here -->
+                        </div>
+                    </div>
+
+                    <!-- Scrolling song list -->
+                    <div id="song-list-container" class="overflow-y-auto pr-2 space-y-2" style="max-height: 500px;">
+                        <!-- Song list will be dynamically generated here -->
+                    </div>
+                </div>
+                 <div class="mt-4 text-center text-sm text-stone-500">
+                    <p>Click on the <span class="text-amber-400 font-bold">dotted underlined lyrics</span> for deeper analysis.</p>
+                </div>
+            </div>
+
+            <!-- Lyrics Section -->
+            <div id="lyrics-container" class="space-y-2 text-xl md:text-2xl leading-relaxed">
+                <!-- Lyrics will be populated by JavaScript -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Pop-up Modal Structure -->
+    <div id="popup-template" class="popup-overlay">
+        <div class="popup-content">
+            <button class="close-popup absolute top-2 right-4 text-stone-400 hover:text-white">&times;</button>
+            <h3 id="popup-title" class="text-2xl font-bold mb-4 text-amber-400"></h3>
+            <div id="popup-text" class="text-stone-300"></div>
+        </div>
+    </div>
+
+
+    <script>
+        // --------------------------------------------------------------------
+        // CONFIGURATION
+        // --------------------------------------------------------------------
+
+        // ====> STEP 1: ADD YOUR SONG VERSIONS HERE <====
+        const songVersions = [
+            { id: 1, title: 'Folk Rock Anthem', audioSrc: 'https://cdn.pixabay.com/audio/2022/11/22/audio_2c8b28a827.mp3', tags: ['male-vocal', 'rock', 'full-band'] },
+            { id: 2, title: 'Gentle Piano Ballad', audioSrc: 'https://cdn.pixabay.com/audio/2023/10/11/audio_a25520997c.mp3', tags: ['female-vocal', 'classic', 'piano'] },
+            { id: 3, title: '80s Retro Wave', audioSrc: 'https://cdn.pixabay.com/audio/2022/05/27/audio_18084b9163.mp3', tags: ['male-vocal', '80s-vibe', 'full-band'] },
+            { id: 4, title: 'Heartland Country', audioSrc: 'https://cdn.pixabay.com/audio/2022/03/15/audio_29522b166e.mp3', tags: ['male-vocal', 'country', 'full-band'] },
+            { id: 5, title: 'Stripped-Back Acoustic', audioSrc: 'https://cdn.pixabay.com/audio/2024/02/08/audio_2911995a7f.mp3', tags: ['female-vocal', 'folk', 'minimal'] },
+            { id: 6, title: 'Cinematic Orchestra', audioSrc: 'https://cdn.pixabay.com/audio/2024/05/17/audio_43891b6e49.mp3', tags: ['female-vocal', 'classic', 'orchestra'] },
+            { id: 7, title: 'Delta Blues Jam', audioSrc: 'https://cdn.pixabay.com/audio/2022/05/20/audio_2c70a8314a.mp3', tags: ['male-vocal', 'blues', 'minimal'] },
+        ];
+
+        // ====> STEP 2: DEFINE YOUR FILTER TAGS HERE <====
+        const filterGroups = [
+            { name: 'Vocal Style', tags: [ { label: 'Male', tag: 'male-vocal' }, { label: 'Female', tag: 'female-vocal' } ] },
+            { name: 'Genre', tags: [ { label: 'Rock', tag: 'rock' }, { label: 'Classic', tag: 'classic' }, { label: 'Country', tag: 'country' }, { label: 'Folk', tag: 'folk' }, { label: 'Blues', tag: 'blues' } ] },
+            { name: 'Era', tags: [ { label: '80s Vibe', tag: '80s-vibe' } ] },
+            { name: 'Instrumentation', tags: [ { label: 'Full Band', tag: 'full-band' }, { label: 'Piano', tag: 'piano' }, { label: 'Minimal', tag: 'minimal' }, { label: 'Orchestra', tag: 'orchestra' } ] },
+        ];
+
+        // LYRICS AND ANNOTATIONS (timestamps may need adjustment for each song version)
+        const lyricsData = [ /* ... LYRICS DATA FROM PREVIOUS VERSION ... */ ];
+        const annotations = { /* ... ANNOTATIONS DATA FROM PREVIOUS VERSION ... */ };
+        // NOTE: For simplicity, we use one set of timestamps. For perfect sync on all versions,
+        // you would need to create separate lyricsData arrays for each song.
+
+        // --- PASTE LYRICS AND ANNOTATIONS HERE ---
+        const lyricsDataPasted = [
+            { time: 5, line: "Years on my shoulders, the mirror’s a thief," }, { time: 8, line: "Stealing my fire, my faith, my belief." }, { time: 12, line: "The days blur together, the seasons all fade," }, { time: 15, line: "I’m living in echoes of the choices I made." }, { time: 19, line: "Then comes a whisper — a method, a tone," }, { time: 22, line: "A vow in my chest: <span class='lyric-link' onclick='showPopup(\"sixtyDays\")'>sixty days set in stone.</span>" }, { time: 28, line: "<span class='lyric-link' onclick='showPopup(\"sands\")'>Crystal sands I combine</span>, seal myself inside" }, { time: 32, line: "Human <span class='lyric-link' onclick='showPopup(\"chrysalis\")'>chrysalis</span>, with healing intent" }, { time: 35, line: "<span class='lyric-link' onclick='showPopup(\"geode\")'>Geode I built</span>, my transformative ascent" }, { time: 38, line: "<span class='lyric-link' onclick='showPopup(\"hbot\")'>Two hours a day, two atmospheres in,</span>" }, { time: 42, line: "Pure oxygen I breath, I contemplate alone," }, { time: 45, line: "<span class='lyric-link' onclick='showPopup(\"telomeres\")'>Regrowing telomeres</span> — sixty days set in stone" }, { time: 51, line: "<span class='lyric-link' onclick='showPopup(\"baseline\")'>Baseline tests</span>, I strip to the core," }, { time: 54, line: "My blood and stool tell the tales I ignore." }, { time: 58, line: "D.N.A. mapped, R.N.A. strings," }, { time: 61, line: "<span class='lyric-link' onclick='showPopup(\"microbiome\")'>Microbiome secrets</span>, my new understandings," }, { time: 65, line: "Disease markers marked, the truth all my own," }, { time: 68, line: "The clock starts to tick — sixty days set in stone." }, { time: 74, line: "Sixty days set in stone," }, { time: 77, line: "I’m not reborn, but I’ve grown." }, { time: 81, line: "<span class='lyric-link' onclick='showPopup(\"chorusModalities\")'>Pressure, fire, ice, and breath,</span>" }, { time: 84, line: "Walking back from the edge of death." }, { time: 88, line: "Science, spirit, and the will I’ve shown," }, { time: 91, line: "Building my future, in my chrysalis alone." }, { time: 97, line: "<span class='lyric-link' onclick='showPopup(\"sauna\")'>Sauna heat</span> burns doubt from my veins," }, { time: 100, line: "<span class='lyric-link' onclick='showPopup(\"iceBaths\")'>Ice baths bite</span> and rewires the chains." }, { time: 104, line: "Two atmospheres press my lungs awake," }, { time: 107, line: "H.B.O.T. chambers, where futures take shape." }, { time: 111, line: "Brainwaves measured, my heartbeat known," }, { time: 114, line: "Each breath a moment — sixty days set in stone." }, { time: 120, line: "<span class='lyric-link' onclick='showPopup(\"fasting\")'>Deep fasting sharpens</span>, and healing teas flow," }, { time: 124, line: "<span class='lyric-link' onclick='showPopup(\"mushrooms\")'>Mushrooms and minerals</span> all help me grow." }, { time: 127, line: "<span class='lyric-link' onclick='showPopup(\"light\")'>Light on my skin</span>, uplifting music in my mind," }, { time: 131, line: "A brand new <span class='lyric-link' onclick='showPopup(\"aiTwin\")'>A.I. reflection</span> — my mirror’s alive." }, { time: 134, line: "The twin I’m creating is almost my clone," }, { time: 138, line: "Guiding my steps through sixty days set in stone." }, { time: 143, line: "Sixty days set in stone," }, { time: 146, line: "I’m not reborn, but I’ve grown." }, { time: 150, line: "Pressure, fire, ice, and breath," }, { time: 153, line: "Walking back from the edge of death." }, { time: 157, line: "Science, spirit, and the will I’ve shown," }, { time: 160, line: "Building my future, in my chrysalis alone." }, { time: 166, line: "<span class='lyric-link' onclick='showPopup(\"markersMoved\")'>Tests come again — the markers have moved,</span>" }, { time: 170, line: "The data is proof of the life I’ve improved." }, { time: 173, line: "Confidence blooms, my strength takes flight," }, { time: 177, line: "I wake with a hunger for each new night." }, { time: 180, line: "Not chasing youth, but the power I’ve grown," }, { time: 184, line: "Living my vow — sixty days set in stone." }, { time: 190, line: "The chamber releases, the quartz parts wide," }, { time: 193, line: "I step through the door, my <span class='lyric-link' onclick='showPopup(\"twinAligned\")'>A.I. twin now aligned</span>" }, { time: 197, line: "At peace with my past, in love with the now," }, { time: 200, line: "The future’s a garden, I’ve planted the how." }, { time: 204, line: "Not reborn — but retooled, redesigned, fully grown," }, { time: 208, line: "New journey begins… thanks to sixty days set in stone." }, { time: 214, line: "Every breath a cathedral bell," }, { time: 217, line: "Every step a truth to tell." }, { time: 221, line: "<span class='lyric-link' onclick='showPopup(\"bonesToCode\")'>From bones to code, I’ve been shown</span>" }, { time: 224, line: "How to build my own A.I. clone" }, { time: 228, line: "My life revised and revived," }, { time: 231, line: "I doubled down and aligned" }, { time: 235, line: "Sixty 2-hours sessions," }, { time: 238, line: "Breathing O2 all alone," }, { time: 242, line: "Sixty days… set in stone." }, { time: 245, line: "Sixty days… set in stone." }, { time: 249, line: "I tell you brother, sister, friend" }, { time: 252, line: "I tell you mother, father, aunty, uncle" }, { time: 256, line: "if you really, really want to mend!!!!" }, { time: 260, line: "Do sixty days set in stone!!!!" }, { time: 263, line: "Do sixty days set in stone!!!!" },
+        ];
+        const annotationsPasted = {
+            "sixtyDays": { title: "The Aura Genesis Protocol", text: `<p>The 'sixty days set in stone' represents the foundational experience of the Aura of Intelligence ecosystem. It's a 60-session journey designed to create and socialize a personal Digital Twin, moving beyond the 'quantified self' to the 'qualified self' where subjective experience is fused with objective biological data.</p>` }, "sands": { title: "Geopoetic Alchemy", text: `<p>Each Aura Capsule's shell begins with 99% pure crystalline quartz sand from Minjerribah (North Stradbroke Island). This 'geopoetic alchemy' involves blending the base sand with other crystals and minerals to embed the user's intention and 'soulprint' into the very structure of their transformative vessel.</p>` }, "chrysalis": { title: "The Human Chrysalis", text: `<p>The term 'chrysalis' refers to the Aura Capsule, the physical nexus of the ecosystem. It's an ovoid-shaped, medical-grade device designed for safety, comfort, and precise environmental control. It serves as a technological 'womb' for the birth of the Digital Twin.</p>` }, "geode": { title: "The Aura Geode", text: `<p>The capsule is envisioned as a geode—a plain exterior that holds a crystalline, transformative world within. This reflects the user's journey of inward reflection to unlock their inner potential, facilitated by advanced technology.</p>` }, "hbot": { title: "Hyperbaric Oxygen Therapy (HBOT)", text: `<p>Inside the capsule, the user breathes nearly pure oxygen at an elevated pressure (up to 2 atmospheres). This floods the body's tissues with oxygen, which can reverse hypoxia, reduce inflammation, and create an environment inhospitable to certain pathologies.</p><a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3510426/" target="_blank" class="popup-link">Explore the review on HBOT and cancer</a>` }, "telomeres": { title: "Regenerative Science", text: `<p>Telomeres are protective caps on our chromosomes that shorten as we age. A groundbreaking 2020 study in the journal 'Aging' showed that a 3-month protocol of HBOT could significantly increase telomere length in immune cells of healthy older adults, effectively reversing this aging biomarker.</p><a href="https://www.aging-us.com/article/202188" target="_blank" class="popup-link">Read the Telomere Study</a>` }, "baseline": { title: "Phase 1: Discovery & Mapping", text: `<p>The journey begins with comprehensive baseline testing. The 'Aura Bio-Kit' collects samples to analyze DNA, RNA, microbiome composition, and key disease markers. This data forms the initial state of the Digital Twin, mapping the user's unique biological landscape before the transformation begins.</p>` }, "microbiome": { title: "The Microbiome as Mediator", text: `<p>The gut microbiome is a central mediator of health, translating external factors (diet, toxins, stress) into internal pathology. A 2022 review in 'Gut' highlights how targeting the microbiota can optimize therapy outcomes, underscoring its importance in a systemic approach to health.</p><a href="https://gut.bmj.com/content/71/7/1412" target="_blank" class="popup-link">Learn about Cancer Pharmacomicrobiomics</a>` }, "chorusModalities": { title: "A Symphony of Therapies", text: `<p>'Pressure' (HBOT), 'fire' (sauna), 'ice' (cold plunge), and 'breath' (oxygen/breathwork) are the core hormetic stressors used in the protocol. These controlled exposures trigger adaptive responses, building cellular resilience and enhancing the body's repair mechanisms.</p>` }, "sauna": { title: "Sauna & Heat Shock Proteins", text: `<p>Infrared sauna use induces a mild hyperthermic state, which activates heat shock proteins. These proteins help repair damaged cells, reduce inflammation, and are crucial for cellular health and resilience, as detailed in numerous studies on the physiological effects of heat stress.</p><a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5941775/" target="_blank" class="popup-link">Review the effects of regular sauna bathing</a>` }, "iceBaths": { title: "Cold Plunge & Hormesis", text: `<p>Ice baths are a powerful form of hormetic stress. Research has shown that cold water immersion can lower inflammatory markers, improve immune function, and trigger the release of mood-elevating neurotransmitters. It 'rewires the chains' of chronic inflammation.</p><a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9632262/" target="_blank" class="popup-link">Scientific evidence for cold water immersion</a>` }, "fasting": { title: "Autophagy & Metabolic Reset", text: `<p>Deep fasting induces autophagy, the body's cellular recycling system, a discovery that won the 2016 Nobel Prize in Medicine. During autophagy, cells remove dysfunctional components, a process crucial for preventing disease and promoting regeneration. Fasting also resets metabolic pathways, improving insulin sensitivity.</p><a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6938162/" target="_blank" class="popup-link">Read about fasting and cancer</a>` }, "mushrooms": { title: "Mycotherapy", text: `<p>This refers to the use of medicinal mushrooms (like Turkey Tail) for their potent immunomodulatory properties. Polysaccharide-K (PSK) from Turkey Tail is an approved adjunct cancer therapy in Japan, with clinical trials showing it can improve survival in patients with gastrointestinal cancers.</p><a href="https://www.cancer.gov/about-cancer/treatment/cam/patient/mushrooms-pdq" target="_blank" class="popup-link">See the NCI's review on medicinal mushrooms</a>` }, "light": { title: "Photobiomodulation (PBM)", text: `<p>The protocol uses specific wavelengths of light (red and near-infrared) to stimulate cellular function. The primary mechanism involves light absorption by cytochrome c oxidase in the mitochondria, which enhances ATP (energy) production, reduces inflammation, and accelerates tissue healing.</p><a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5946726/" target="_blank" class="popup-link">Explore the science of Photobiomodulation</a>` }, "aiTwin": { title: "The Interactive Digital Twin", text: `<p>The AI Twin is a dynamic, interactive model of the self, built from the fusion of objective biometric data and subjective feedback. The concept of Human Digital Twins is an emerging field in personalized healthcare, aiming to create virtual counterparts for simulation, prediction, and optimization of health.</p><a href="https://www.nature.com/articles/s41591-021-01341-8" target="_blank" class="popup-link">Read about Digital Twins in 'Nature Medicine'</a>` }, "markersMoved": { title: "Phase 3: Validation", text: `<p>This reflects the validation phase of the Genesis Protocol. After weeks of intervention, new Bio-Kit tests are done. The 'markers'—be they inflammatory, hormonal, or genetic—have measurably improved, providing objective, data-driven proof of the transformation.</p>` }, "twinAligned": { title: "The Emergent Dynamic", text: `<p>An 'aligned' twin signifies the successful completion of the Genesis Protocol. The relationship between the Original and the Twin has settled into a functional archetype: Oracle, Guardian, or Symbiote. The twin is now ready to be deployed as a life co-pilot, integrated into wearables and smart environments.</p>` }, "bonesToCode": { title: "The Fusion of Biology and Data", text: `<p>This line encapsulates the entire project: translating the deep complexity of a human being—from their physical body ('bones') to their consciousness—into a structured, intelligent, and useful digital format ('code'). It is the birth of the qualified self.</p>` },
+        };
+        lyricsData.splice(0, lyricsData.length, ...lyricsDataPasted);
+        Object.assign(annotations, annotationsPasted);
+
+
+        // --------------------------------------------------------------------
+        // APPLICATION LOGIC (No need to edit below this line)
+        // --------------------------------------------------------------------
+        const audioPlayer = document.getElementById('audio-player');
+        const filterContainer = document.getElementById('filter-container');
+        const songListContainer = document.getElementById('song-list-container');
+        const lyricsContainer = document.getElementById('lyrics-container');
+        const popupTemplate = document.getElementById('popup-template');
+        const popupTitle = document.getElementById('popup-title');
+        const popupText = document.getElementById('popup-text');
+
+        let activeFilters = new Set();
+        let currentSongId = null;
+
+        function renderFilters() {
+            filterContainer.innerHTML = '';
+            filterGroups.forEach(group => {
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'mb-3';
+                const groupLabel = document.createElement('p');
+                groupLabel.className = 'text-sm text-stone-400 mb-2';
+                groupLabel.textContent = group.name;
+                groupDiv.appendChild(groupLabel);
+                
+                const buttonsDiv = document.createElement('div');
+                buttonsDiv.className = 'flex flex-wrap gap-2';
+                group.tags.forEach(({label, tag}) => {
+                    const button = document.createElement('button');
+                    button.textContent = label;
+                    button.dataset.tag = tag;
+                    button.className = 'filter-btn px-3 py-1 text-sm font-semibold bg-stone-800 text-stone-300 rounded-full border border-stone-700 hover:bg-amber-500 hover:text-stone-900';
+                    button.onclick = () => toggleFilter(tag);
+                    buttonsDiv.appendChild(button);
+                });
+                groupDiv.appendChild(buttonsDiv);
+                filterContainer.appendChild(groupDiv);
+            });
+        }
+
+        function toggleFilter(tag) {
+            const btn = document.querySelector(`.filter-btn[data-tag="${tag}"]`);
+            if (activeFilters.has(tag)) {
+                activeFilters.delete(tag);
+                btn.classList.remove('active');
+            } else {
+                activeFilters.add(tag);
+                btn.classList.add('active');
+            }
+            renderSongList();
+        }
+
+        function renderSongList() {
+            songListContainer.innerHTML = '';
+            const filteredSongs = songVersions.filter(song => {
+                return [...activeFilters].every(filter => song.tags.includes(filter));
+            });
+
+            if (filteredSongs.length === 0) {
+                 songListContainer.innerHTML = `<p class="text-stone-500 text-center p-4">No songs match the selected filters. Try removing some filters!</p>`;
+                 return;
+            }
+
+            filteredSongs.forEach(song => {
+                const songDiv = document.createElement('div');
+                songDiv.className = `song-item p-3 border border-stone-700 rounded-lg cursor-pointer hover:bg-stone-800 flex justify-between items-center transition-colors`;
+                if (song.id === currentSongId) {
+                    songDiv.classList.add('playing');
+                }
+                songDiv.innerHTML = `<span>${song.title}</span><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play-circle"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16 10,8"/></svg>`;
+                songDiv.onclick = () => playSong(song.id);
+                songListContainer.appendChild(songDiv);
+            });
+        }
+
+        function playSong(id) {
+            const song = songVersions.find(s => s.id === id);
+            if (song) {
+                currentSongId = id;
+                audioPlayer.src = song.audioSrc;
+                audioPlayer.play();
+                renderSongList(); // Re-render to highlight the new song
+            }
+        }
+
+        function initializeLyrics() {
+            lyricsContainer.innerHTML = '';
+            lyricsData.forEach((lyric, index) => {
+                const p = document.createElement('p');
+                p.id = `lyric-${index}`;
+                p.classList.add('lyric');
+                p.dataset.time = lyric.time;
+                p.innerHTML = lyric.line;
+                lyricsContainer.appendChild(p);
+            });
+        }
+
+        let currentLyricIndex = -1;
+        function updateLyrics() {
+            if (!audioPlayer || audioPlayer.paused) {
+                return;
+            }
+
+            const currentTime = audioPlayer.currentTime;
+            let activeIndex = -1;
+
+            for (let i = lyricsData.length - 1; i >= 0; i--) {
+                if (lyricsData[i].time && currentTime >= lyricsData[i].time) {
+                    activeIndex = i;
+                    break;
+                }
+            }
+
+            if (activeIndex !== currentLyricIndex) {
+                if (currentLyricIndex !== -1) {
+                    const oldLyric = document.getElementById(`lyric-${currentLyricIndex}`);
+                    if(oldLyric) oldLyric.classList.remove('active');
+                }
+                if (activeIndex !== -1) {
+                    const activeLyricElement = document.getElementById(`lyric-${activeIndex}`);
+                    if(activeLyricElement) {
+                        activeLyricElement.classList.add('active');
+                        activeLyricElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }
+                currentLyricIndex = activeIndex;
+            }
+        }
+
+        function showPopup(key) {
+            const annotation = annotations[key];
+            if (annotation) {
+                popupTitle.textContent = annotation.title;
+                popupText.innerHTML = annotation.text;
+                popupTemplate.classList.add('visible');
+            }
+        }
+
+        function hidePopup() {
+            popupTemplate.classList.remove('visible');
+        }
+
+        // Event Listeners
+        audioPlayer.addEventListener('timeupdate', updateLyrics);
+        popupTemplate.addEventListener('click', (e) => { if (e.target === popupTemplate) hidePopup(); });
+        document.querySelector('.close-popup').addEventListener('click', hidePopup);
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hidePopup(); });
+
+        // Initial Load
+        window.onload = () => {
+            initializeLyrics();
+            renderFilters();
+            if (songVersions.length > 0) {
+                // Load the first song's data without playing it.
+                // User interaction is required to start playback.
+                const firstSong = songVersions[0];
+                currentSongId = firstSong.id;
+                audioPlayer.src = firstSong.audioSrc;
+            }
+            renderSongList(); // Render the full list, highlighting the pre-loaded song.
+        };
+    </script>
+
+</body>
+</html>
